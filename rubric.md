@@ -100,7 +100,7 @@ If you can defend each criterion against the deck, you understand the lab. If yo
 
 > Kết quả kiểm tra trực tiếp trên artifact hiện có trong repo (`adapters/`, `data/`, `submission/`) + `python scripts/verify.py`. Đây **không phải điểm chính thức của giảng viên** — chỉ là bảng tự-chấm để biết còn thiếu gì trước khi nộp.
 >
-> **Lưu ý:** NB3 (DPO training) và NB4 (compare & eval) **chưa chạy xong** — các mục dưới đây đang ở trạng thái dở dang (config/metrics ghi ra được nhưng thiếu output cuối), không phải đã chạy và thất bại.
+> **Lưu ý:** NB3 (DPO training) đã chạy xong **trên Kaggle** và số liệu thật đã được đồng bộ vào `adapters/dpo/dpo_metrics.json` + ảnh `submission/screenshots/03-dpo-reward-curves.png` (từ log terminal Kaggle, không có file `.ipynb`/checkpoint gốc để tải về). File nhị phân `adapter_model.safetensors` (119.8 MB) **vẫn chỉ nằm trên Kaggle**, chưa có trong repo cục bộ này. NB4 (compare & eval) **vẫn chưa chạy xong**.
 
 | # | Notebook | Criterion | Pts | Trạng thái | Bằng chứng / lý do |
 |---|---|---:|---:|---|---|
@@ -109,41 +109,39 @@ If you can defend each criterion against the deck, you understand the lab. If yo
 | 1 | `01_sft_mini` | ≥1 sample generation in NB1 | 5 | ⚠️ Không có bằng chứng | Không tìm thấy notebook `.ipynb` đã chạy hoặc output nào chứa sample generation |
 | 2 | `02_preference_data` | `train.parquet` với `prompt/chosen/rejected` | 6 | ✅ Đạt (file tồn tại) | `data/pref/train.parquet` + `eval.parquet` đã có; chưa verify được tên cột (môi trường này thiếu `pandas`) |
 | 2 | `02_preference_data` | 3 examples printed, chosen ≠ rejected | 6 | ⚠️ Không có bằng chứng | Không có notebook output đã chạy để xác nhận |
-| 3 | `03_dpo_train` | adapter_config.json, distinct from sft-mini | 6 | ⚠️ Nghi vấn | `adapters/dpo/adapter_config.json` **giống hệt byte-for-byte** với sft-mini (`diff` = rỗng); và **không có `adapter_model.safetensors`** trong `adapters/dpo/` — trọng số DPO chưa được lưu |
-| 3 | `03_dpo_train` | Reward gap plot tăng | 12 | ❌ Chưa đạt | `03-dpo.png`: panel bên phải hiện **"No reward columns found"** — chưa có dữ liệu reward nào được log |
-| 3 | `03_dpo_train` | Chosen & rejected curves riêng + interpret | 10 | ❌ Chưa đạt | Không có curve nào được vẽ; `dpo_metrics.json` → `end_chosen_reward`, `end_rejected_reward`, `end_reward_gap` đều `null` |
+| 3 | `03_dpo_train` | adapter_config.json, distinct from sft-mini | 6 | ⚠️ Nửa đạt | `dpo_metrics.json` giờ có số liệu thật, khác hẳn sft-mini (đúng là 1 lần train DPO riêng) — nhưng `adapter_config.json` (siêu tham số LoRA) vẫn giống hệt sft-mini về nội dung, và **thiếu `adapter_model.safetensors`** (trọng số thật) trong repo cục bộ vì chỉ có log terminal từ Kaggle, chưa tải file về |
+| 3 | `03_dpo_train` | Reward gap plot tăng | 12 | ✅ **Đạt** | Log Kaggle xác nhận: `end_chosen_reward = -0.093`, `end_rejected_reward = -1.377`, **`end_reward_gap = +1.284`** (dương, tăng từ ~0). Đã ghi vào `adapters/dpo/dpo_metrics.json`. `final_train_loss` cũng giảm mạnh: 1.529 (lần chạy hỏng trước) → **0.528** (lần chạy đúng) |
+| 3 | `03_dpo_train` | Chosen & rejected curves riêng + interpret | 10 | ⚠️ Nửa đạt | Ảnh `03-dpo-reward-curves.png` (đã lưu) có **cả 2 đường riêng biệt**: `chosen reward` gần như đi ngang quanh 0 (dao động −0.1→−0.45, kết −0.093), `rejected reward` giảm mạnh 0→−1.7 (kết −1.377). → gap dương chủ yếu do **rejected rớt nhanh hơn** chứ không phải chosen tăng nhiều — dấu hiệu *likelihood displacement* (deck §3.4), nên diễn giải kỹ điều này. Plot đạt, nhưng phần "interpreted in REFLECTION" **vẫn thiếu** (§3 còn để trống) |
 | 4 | `04_compare_and_eval` | Side-by-side ≥8 prompts × 2 models | 8 | ❌ Chưa đạt | `data/eval/side_by_side.jsonl` **không tồn tại** — NB4 chưa chạy (chỉ có `data/eval/prompts.json` là input 8 prompt, chưa có output) |
 | 4 | `04_compare_and_eval` | Win/loss/tie summary | 7 | ❌ Chưa đạt | `data/eval/judge_results.json` **không tồn tại** |
 | — | Core | Reproducible (`setup-laptop.sh` + `make pipeline`) | 5 | ⚠️ Chưa test | Không có `.venv` trong môi trường hiện tại, chưa chạy lại được toàn bộ pipeline để xác nhận |
 | — | Reflection | `REFLECTION.md` core sections, ≥150 từ ở §3+§6 | 15 | ❌ Chưa đạt | File vẫn là **template gốc**, còn placeholder chưa điền (`<Họ Tên>`, `<YYYY-MM-DD>`, §3/§6 vẫn "Answer here") |
-| — | Reflection | §3 interprets both chosen/rejected trajectories | 5 | ❌ Chưa đạt | §3 để trống — vả lại không có dữ liệu reward để mà interpret (xem NB3 ở trên) |
-| — | Verify | `make verify` exits 0 | 3 | ❌ Chưa đạt | `python scripts/verify.py` → **exit code 1**, 5 lỗi (log bên dưới) |
-| **Ước tính** | | | **~12–18 / 100** | | Chắc chắn đạt: #1 config (6đ) + #2 file data tồn tại (6đ); phần còn lại cần chạy lại hoặc bổ sung |
+| — | Reflection | §3 interprets both chosen/rejected trajectories | 5 | ❌ Chưa đạt | §3 để trống — giờ đã có đủ số liệu thật (chosen/rejected/gap) để viết, chỉ cần điền |
+| — | Verify | `make verify` exits 0 | 3 | ❌ Chưa đạt | `python scripts/verify.py` → **exit code 1**, còn 3 lỗi (log bên dưới) — đỡ hơn lần trước (5 lỗi) |
+| **Ước tính** | | | **~30–36 / 100** | | Chắc chắn đạt: #1 config (6đ) + #2 data file (6đ) + reward gap plot (12đ); nửa điểm: dpo config (6đ) + chosen/rejected curves (10đ, thiếu phần interpret) |
 
 <details>
-<summary>Log đầy đủ từ <code>python scripts/verify.py</code></summary>
+<summary>Log đầy đủ từ <code>python scripts/verify.py</code> (sau khi cập nhật dpo_metrics.json + có ảnh reward curves)</summary>
 
 ```
-✓ submission/screenshots/ has 2 image(s)
+✓ submission/screenshots/ has 3 image(s)
 
 ⓘ Optional (bonus) not done — fine for a core pass:
   - NB5 GGUF (gguf/*.gguf) not done
   - NB6 benchmark (data/eval/benchmark_results.json) not done
 
 ✗ Submission not ready yet:
-  - WARN     adapters/dpo/dpo_metrics.json has no end_reward_gap (TRL log columns missing?)
   - MISSING  side-by-side eval (NB4 output): data/eval/side_by_side.jsonl
   - MISSING  judge results (NB4 output): data/eval/judge_results.json
   - UNEDITED submission/REFLECTION.md still has 5 template placeholders.
-  - TOO FEW  submission/screenshots/: have 2, need at least 3.
 ```
 </details>
 
 ### Việc cần làm tiếp theo (theo thứ tự ưu tiên)
 
-1. **Chạy xong NB3 (DPO)** — hiện log training chưa có cột `chosen_rewards`/`rejected_rewards` và adapter chưa lưu `adapter_model.safetensors`. Khi chạy lại/chạy tiếp, kiểm tra `DPOTrainer`/`DPOConfig` (report_to/logging callback) và đảm bảo notebook chạy tới bước `save_pretrained` cuối cùng.
-2. **Chạy xong NB4** để sinh `data/eval/side_by_side.jsonl` + `data/eval/judge_results.json`.
-3. **Điền `submission/REFLECTION.md`** đầy đủ 6 mục, đặc biệt §3 (reward curves) và §6 (≥150 từ mỗi mục) — hiện vẫn là bản mẫu gốc.
-4. **Bổ sung screenshot** — hiện có 2/6 (cần tối thiểu 3 để qua `make verify`, cần đủ 6 để full điểm).
-5. **Xem lại loss NB1** — không giảm đơn điệu (tăng trở lại cuối epoch); cần chạy lại hoặc giải thích rõ trong REFLECTION nếu là nhiễu chấp nhận được.
+1. **Tải `adapter_model.safetensors` từ Kaggle về** `adapters/dpo/` — vào tab **Output** của Kaggle notebook (sau khi Run All xong) để tải file 119.8 MB, hoặc dùng `kaggle kernels output <user>/<kernel-slug> -p adapters/dpo/` bằng Kaggle API. Không có file này thì adapter DPO không dùng lại được (dù đã có config + metrics).
+2. **Chạy xong NB4** để sinh `data/eval/side_by_side.jsonl` + `data/eval/judge_results.json` (cần adapter DPO ở bước 1 để load model so sánh).
+3. **Điền `submission/REFLECTION.md`** — giờ đã có đủ số để viết §2 (bảng loss/reward) và §3 (≥100 từ, diễn giải likelihood displacement như trên); §6 vẫn cần tự viết (≥150 từ).
+4. **Bổ sung thêm screenshot** — hiện có 3/6 required (đủ để `make verify` pass phần số lượng, nhưng cần đủ 6 để full điểm rubric gốc: cần thêm `01-setup-gpu`, `04-side-by-side-table`, `05-judge-output`).
+5. **Xem lại loss NB1 (SFT)** — không giảm đơn điệu (tăng trở lại cuối epoch); cần chạy lại hoặc giải thích rõ trong REFLECTION nếu là nhiễu chấp nhận được.
 6. Sau khi sửa xong, chạy lại `python scripts/verify.py` (hoặc `make verify`) để xác nhận exit code 0.
